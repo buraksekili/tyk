@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kelseyhightower/envconfig"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -1021,6 +1022,51 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 	}
 
 	return response, http.StatusOK
+}
+
+func (gw *Gateway) configExportHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("config")
+	doJSONWrite(w, 200, gw.GetConfig())
+}
+
+func (gw *Gateway) environmentVarExportHandler(w http.ResponseWriter, r *http.Request) {
+	type Environ struct {
+		EnvKey string `json:"env_variable"`
+		Value  string `json:"value"`
+	}
+	outputAllEnvs, err := strconv.ParseBool(r.URL.Query().Get("all"))
+	if err != nil {
+		outputAllEnvs = false
+	}
+
+	config := gw.GetConfig()
+	gwEnvironmentPrefix := "TYK_GW"
+	var environVars []Environ
+	var b bytes.Buffer
+
+	if err := envconfig.Usagef(gwEnvironmentPrefix, &config, &b, "{{range .}}{{usage_key .}}={{usage_description .}}{{end}}"); err != nil {
+		fmt.Println("failed to get usage information from 'envconfig', err: ", err)
+		doJSONWrite(w, 500, struct {
+			Err string `json:"error"`
+		}{Err: "internal error"})
+		return
+	}
+
+	envs := strings.Split(strings.TrimSpace(b.String()), "=")
+	for _, env := range envs {
+		v := os.Getenv(env)
+		if !outputAllEnvs && v != "" {
+			environVars = append(environVars, Environ{EnvKey: env, Value: v})
+			continue
+		}
+
+		if outputAllEnvs {
+			environVars = append(environVars, Environ{EnvKey: env, Value: v})
+		}
+
+	}
+
+	doJSONWrite(w, 200, environVars)
 }
 
 func (gw *Gateway) polHandler(w http.ResponseWriter, r *http.Request) {

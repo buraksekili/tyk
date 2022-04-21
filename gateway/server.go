@@ -639,6 +639,9 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
+	r.HandleFunc("/config", gw.configExportHandler).Methods(http.MethodGet)
+	r.HandleFunc("/config/env", gw.environmentVarExportHandler).Methods(http.MethodGet)
+
 	mainLog.Debug("Loaded API Endpoints")
 }
 
